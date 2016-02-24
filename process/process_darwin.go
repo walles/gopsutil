@@ -219,29 +219,22 @@ func convertCpuTimes(s string) (ret float64, err error) {
 	t += h
 	return float64(t) / ClockTicks, nil
 }
+
+// CPUTimes returns CPU usage statistics for this process
 func (p *Process) CPUTimes() (*cpu.CPUTimesStat, error) {
-	r, err := callPs("utime,stime", p.Pid, false)
-
+	k, err := p.getKProc()
 	if err != nil {
 		return nil, err
 	}
 
-	utime, err := convertCpuTimes(r[0][0])
-	if err != nil {
-		return nil, err
-	}
-	stime, err := convertCpuTimes(r[0][1])
-	if err != nil {
-		return nil, err
-	}
-
-	ret := &cpu.CPUTimesStat{
+	return &cpu.CPUTimesStat{
 		CPU:    "cpu",
-		User:   utime,
-		System: stime,
-	}
-	return ret, nil
+		User:   float64(k.Proc.P_uticks) * float64(ClockTicks),
+		System: float64(k.Proc.P_sticks) * float64(ClockTicks),
+		// FIXME: There should be an interrupts field as well for OS X
+	}, nil
 }
+
 func (p *Process) CPUAffinity() ([]int32, error) {
 	return nil, common.NotImplementedError
 }
@@ -390,6 +383,8 @@ func (p *Process) getKProc() (*KinfoProc, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println(k)
 
 	return &k, nil
 }
